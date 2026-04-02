@@ -1,0 +1,62 @@
+DM2RHO: Required Inputs and Early Validation
+==========================================
+
+This utility reconstructs real-space density information from a density matrix.
+To avoid silent corruption, all required inputs must be available and mutually
+consistent before any heavy computation starts.
+
+Required inputs (must all be present)
+-------------------------------------
+
+1. **DM matrix data**
+   - Classic DM file or NetCDF `DM.nc` equivalent.
+   - Must include dimensions and matrix entries needed for the target spin/channel.
+
+2. **Sparse structure / index mapping**
+   - `numd`, `listdptr`, `listd`, and `indxuo` (or a fully equivalent mapping).
+   - Must define the same sparse layout used when the DM was written.
+
+3. **Orbital-to-atom/species maps**
+   - `iaorb`, `iphorb`, `isa`.
+   - Needed to map each orbital index to atom and species context.
+
+4. **Geometry and mesh definition**
+   - Simulation cell, atomic positions, and mesh definition (cutoff and/or explicit
+     grid sizes).
+   - Must correspond to the system represented by the input DM.
+
+5. **Basis/pseudopotential context for orbital evaluators**
+   - `all_phi`, `rcut` and related radial/orbital metadata.
+   - Typically reconstructed from standard SIESTA input files plus pseudopotentials.
+
+Validation checklist (abort early on failure)
+---------------------------------------------
+
+Before any DM-to-rho accumulation loop starts, enforce all checks below.
+Any failed check must abort with a clear error message.
+
+- [ ] DM source is readable and has valid matrix dimensions.
+- [ ] Sparse arrays (`numd`, `listdptr`, `listd`, `indxuo` or equivalent) are all
+      present.
+- [ ] Sparse pointer/index ranges are internally consistent (no out-of-bounds,
+      monotonic `listdptr`, valid `numd` counts).
+- [ ] Sparse structure dimensions are compatible with DM dimensions.
+- [ ] Orbital mapping arrays (`iaorb`, `iphorb`, `isa`) are present and sized for
+      the same number of orbitals used by the DM/sparse structure.
+- [ ] Orbital indices map to valid atom/species IDs.
+- [ ] Cell and atomic positions are present; atom count matches mapping arrays.
+- [ ] Mesh definition exists and is physically/algorithmically valid (positive
+      cutoff and/or positive grid sizes).
+- [ ] Basis/pseudo-derived orbital evaluator inputs (`all_phi`, `rcut`) exist for
+      all species/orbitals referenced by the mappings.
+- [ ] Radial cutoff and orbital evaluator data are numerically valid (non-negative,
+      finite, and non-empty where required).
+- [ ] Final cross-check: all components imply the same orbital-space dimension as
+      the DM. Abort immediately if any mismatch is detected.
+
+Implementation note
+-------------------
+
+Fail-fast validation should happen in a dedicated preflight stage and return one
+concise diagnostic per failure. Do not attempt partial reconstruction when any
+required input is missing or inconsistent.
